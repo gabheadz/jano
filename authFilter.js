@@ -3,6 +3,12 @@ var fs = require("fs");
 var token = require("./token");
 const debug = require('debug')('jano');
 
+/**
+ * Function that process a request and determines if requestor is authenticated. That is 
+ * if requestor provided a JWT in the 'Authorization' http header, and the JWT is valid
+ * and has not expired.
+ * 
+ */
 var filter = function(req, res, next) {
     
     if (!req.janoConf) {
@@ -68,6 +74,10 @@ var filter = function(req, res, next) {
 
 //----- support methods ------
 
+/**
+ * Determines if requestor is in white listed ip's
+ * 
+ */
 var isWhiteListed = function(req) {
     if (!req.janoConf.whitelisted || req.janoConf.whitelisted === undefined)
         return false;
@@ -84,6 +94,10 @@ var isWhiteListed = function(req) {
     }
 }
 
+/**
+ * Determines if a rule has property anon=true
+ * 
+ */
 var isAnonAllowed = function(req) {
     
     if (!req.janoConf.rules || req.janoConf.rules === undefined)
@@ -107,6 +121,10 @@ var isAnonAllowed = function(req) {
     return false;
 }
 
+/**
+ * Determines if requestor Ip address matches Ip address signed in JWT
+ * 
+ */
 var reqIpMatchCredentialsIp = function(req) {
     if (req.credentials) {
         if (req.credentials.ipaddr === req.ip)

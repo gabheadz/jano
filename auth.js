@@ -7,6 +7,11 @@ const debug = require('debug')('jano');
 const USR_PWD_STRATEGY = 'USR_PWD';
 const TOKEN_STRATEGY = 'JWT_TOKEN';
 
+/**
+ * Function that process a login request. It depends on the 'authenticateFn' defined
+ * in jano Config.
+ * 
+ */
 var signIn = function(req, res, next) {
     
     var strategy = determineAuthenticationStrategy(req);
@@ -36,6 +41,9 @@ var signIn = function(req, res, next) {
 
 }
 
+/**
+ * Determine the kind of login request being issued
+ */
 var determineAuthenticationStrategy = function(req) {
     if (req.body.username || req.body.password) {
         return USR_PWD_STRATEGY;
@@ -48,6 +56,10 @@ var determineAuthenticationStrategy = function(req) {
     }
 }
 
+/**
+ * Authenticate a user using username and password. Relies on 'authenticateFn'
+ * defined in jano config.
+ */ 
 var autenticateWithUsrAndPwd = function(req) {
     
     return new Promise(function(resolve, reject){
@@ -92,6 +104,9 @@ var autenticateWithUsrAndPwd = function(req) {
     });
 }
 
+/**
+ * Authenticate a user using a JWT previusly issued by this app o other app.
+ */ 
 var authenticateWithJwt = function(req) {
     
     return new Promise(function(resolve, reject) {

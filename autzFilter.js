@@ -2,6 +2,12 @@ var _ = require("lodash");
 var fs = require("fs");
 var token = require("./token");
 
+/**
+ * Function that process a request and determines if requestor is authorized. That is 
+ * if requestor has roles that match those defined in a rule for 
+ * an api endpoint.
+ * 
+ */
 var filter = function(req, res, next) {
     
     if (req.whitelisted) {
@@ -31,6 +37,9 @@ var filter = function(req, res, next) {
     
 }
 
+/**
+ * Determines if an url matches one of the rules defined un configuration 
+ */
 var appliesToRequest = function(req) {
     
     if (!req.janoConf.rules || req.janoConf.rules === undefined)
