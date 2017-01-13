@@ -1,6 +1,7 @@
 var _ = require("lodash");
 var fs = require("fs");
 var token = require("./token");
+const debug = require('debug')('jano');
 
 var filter = function(req, res, next) {
     
@@ -41,7 +42,7 @@ var filter = function(req, res, next) {
         //sets te payload in request for other middleware to use
         req.credentials = token.verify(req.get('Authorization').substring(7), cert);
     } catch(err){
-        console.log(err);
+        debug(err);
         //TODO: depending on error return status 500 or 401
         res.status(401).json({ error: err.message });
         return;

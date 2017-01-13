@@ -1,6 +1,8 @@
 var token = require("./token");
 var fs = require("fs");
+var Promise = require("bluebird");
 
+const debug = require('debug')('jano');
 
 const USR_PWD_STRATEGY = 'USR_PWD';
 const TOKEN_STRATEGY = 'JWT_TOKEN';
@@ -16,7 +18,7 @@ var signIn = function(req, res, next) {
             req.error = err;
             next();
         });
-    }    
+    }
     else if (strategy === TOKEN_STRATEGY) {
         authenticateWithJwt(req).then(function(data) {
             req.jwt = data;
@@ -50,7 +52,7 @@ var autenticateWithUsrAndPwd = function(req) {
     
     return new Promise(function(resolve, reject){
             
-        console.log("Authenticating with username and password");
+        debug("Authenticating with username and password");
         
         var username = req.body.username;
         var password = req.body.password;
@@ -75,7 +77,7 @@ var autenticateWithUsrAndPwd = function(req) {
                     roles: data.roles
                 }
                 var cert = fs.readFileSync(req.janoConf.privateKey);  // get private key
-                console.log('authentication successful');
+                debug('authentication successful');
     
                 resolve(token.sign(payload, cert));
                 
@@ -85,7 +87,6 @@ var autenticateWithUsrAndPwd = function(req) {
             });
         }
         else {
-            console.log("No 'authenticateFn' provided.");
             reject(new Error("No 'authenticateFn' provided."));
         }
     });
@@ -93,9 +94,9 @@ var autenticateWithUsrAndPwd = function(req) {
 
 var authenticateWithJwt = function(req) {
     
-    return new Promise(function(resolve, reject){
+    return new Promise(function(resolve, reject) {
                 
-        console.log("Authenticating with token");
+        debug("Authenticating with token");
     
         var token = req.params.token || req.query.token;
     
@@ -108,6 +109,4 @@ var authenticateWithJwt = function(req) {
     });
 }
 
-module.exports = {
-    signIn: signIn
-}
+module.exports = signIn
