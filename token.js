@@ -37,10 +37,10 @@ module.exports = {
     }
     
     payload.uuid = uuidV4();
-
+    
     var token = jwt.sign(payload, cert, options);
     
-    return token;
+    return { 'payload': payload, 'jwt': token};
 
   },
 
@@ -54,7 +54,7 @@ module.exports = {
    */
   verify: function(token, cert, iss) {
     
-    if (!token || token === undefined) { 
+    if (!token || token === undefined) {
       throw new Error('invalid token string');
     }
     

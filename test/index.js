@@ -12,6 +12,8 @@ server.conf(scapegoat);
 var signedJwt = '';
 var authJwt = '';
 var expiredJWT = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqZG9lIiwiaXNzIjoidGVzdEFwcCIsImlwYWRkciI6IjIwMC4xNi43OS4yMiIsInJvbGVzIjpbInJvbGUxIiwicm9sZTIiXSwidXVpZCI6Ijg4N2E0ZDg3LTdhZDQtNDk3Yi04OGEwLTAwODZmYTFlNzU5OSIsImlhdCI6MTQ4NDE2Mjk0OCwiZXhwIjoxNDg0MTY2NTQ4fQ.XQI8HgO-aTPy9Acm0oIn_5CPaqvwBcw1TXw_7xVCsxwhroVRGo4cxQl2qlaTiz_lfSPvYIWGjr_5YsnWQpMmzQuraN4uIfWjUTAMeGrKMGR78CiLVQzvwtk_7W4lDHQeUx1OsM96CaBXhj3vC3p_L14nyvev2-3ENDX3dcmAtlKCi-M1lf1ZNj6U2yZZIsQTsLPoD0dTPRU6aY1NcaLv8muspYi0S52ugo0Vcg012MuuRXXccTcjq85N_lMACFon7_v0AEXGB37AtGQM5FMBMtIyyYcycfUNgsNrjnrkojmOE70N6fqNXQhziFe32Q2NB_5L8r9Pp-DoHNzfK-WdFQ';
+var privateKey = '/home/ubuntu/workspace/jano/test/testApp.pem';
+var publicKey = '/home/ubuntu/workspace/jano/test/testApp_public.pem';
 
 describe('#token-sign', function() {
   it('should sign a JWT', function() {
@@ -20,14 +22,15 @@ describe('#token-sign', function() {
         iss: 'applicationName',
         ipaddr: '127.0.0.1'
     }
-    var cert = fs.readFileSync('./test/private_unencrypted.pem');  // get private key
-    signedJwt = scapegoat.tokenSign(payload, cert);
+    var cert = fs.readFileSync(privateKey);  // get private key
+    var result = scapegoat.tokenSign(payload, cert);
+    signedJwt = result.jwt;
     signedJwt.should.not.equal('')
   });
   
   it('should not sign a JWT - no payload', function() {
     var payload = undefined;
-    var cert = fs.readFileSync('./test/private_unencrypted.pem');  // get private key
+    var cert = fs.readFileSync(privateKey);  // get private key
     try {
       scapegoat.tokenSign(payload, cert)
     } catch(err) {
@@ -54,7 +57,7 @@ describe('#token-sign', function() {
         iss: 'applicationName',
         ipaddr: '127.0.0.1'
     }
-    var cert = fs.readFileSync('./test/private_unencrypted.pem');  // get private key
+    var cert = fs.readFileSync(privateKey);  // get private key
     try {
       scapegoat.tokenSign(payload, cert)
     } catch(err) {
@@ -67,7 +70,7 @@ describe('#token-sign', function() {
         sub: 'jdoe',
         ipaddr: '127.0.0.1'
     }
-    var cert = fs.readFileSync('./test/private_unencrypted.pem');  // get private key
+    var cert = fs.readFileSync(privateKey);  // get private key
     try {
       scapegoat.tokenSign(payload, cert)
     } catch(err) {
@@ -80,7 +83,7 @@ describe('#token-sign', function() {
         sub: 'jdoe',
         iss: 'applicationName'
     }
-    var cert = fs.readFileSync('./test/private_unencrypted.pem');  // get private key
+    var cert = fs.readFileSync(privateKey);  // get private key
     try {
       scapegoat.tokenSign(payload, cert)
     } catch(err) {
@@ -92,7 +95,7 @@ describe('#token-sign', function() {
 
 describe('#token-verify', function() {
   it('should verify a JWT', function() {
-    var cert = fs.readFileSync('./test/public.pem');  // get public key
+    var cert = fs.readFileSync(publicKey);  // get public key
     var payload = scapegoat.tokenVerify(signedJwt, cert);
     payload.should.not.equal('');
     payload.sub.should.equal('jdoe');
@@ -100,7 +103,7 @@ describe('#token-verify', function() {
   });
 
   it('should verify fail - wrong issuer', function() {
-    var cert = fs.readFileSync('./test/public.pem');  // get public key
+    var cert = fs.readFileSync(publicKey);  // get public key
     try {
       var payload = scapegoat.tokenVerify(signedJwt, cert, 'someApp');
     } catch (err) {
@@ -109,7 +112,7 @@ describe('#token-verify', function() {
   });
 });
 
-describe('#authentication process', function() {
+describe('#sign in process', function() {
   
   it('should sign in - username and password', (done) => {
     var host = "http://" + process.env.IP + ':' + process.env.PORT;
@@ -135,11 +138,11 @@ describe('#authentication process', function() {
     chai.request(host)
       .post('/api/login')
       .set('content-type', 'application/json')
-      .send({username: 'jdoe'})
+      .send({username: 'rsmith'})
       .end((err, res) => {
           res.should.have.status(500);
           res.error.should.have.property('message');
-          res.error.text.should.equal('{"status":{"code":500,"message":"username and/or password credentials not provided in request body."}}');
+          res.error.text.should.equal('{"status":{"code":500,"message":"Username and/or password credentials not provided in request body."}}');
         done();
       });
   });
@@ -170,9 +173,9 @@ describe('#authentication process', function() {
   
 });
   
-describe('#authenticated Filter', function() {
+describe('#authentication Filter', function() {
   
-  it('should allow authenticaded user invoke api', (done) => {
+  it('should allow an authenticaded user to invoke api', (done) => {
     var host = "http://" + process.env.IP + ':' + process.env.PORT;
     chai.request(host)
       .post('/api/securedMethod')
@@ -217,8 +220,7 @@ describe('#authenticated Filter', function() {
   
 })
 
-/*
-describe('#authorized Filter', function() {
+describe('#authorization Filter', function() {
   
   it('should not allow authenticaded user invoke api due lack of privileges', (done) => {
     var host = "http://" + process.env.IP + ':' + process.env.PORT;
@@ -235,4 +237,39 @@ describe('#authorized Filter', function() {
   });
   
 })
-*/
+
+describe('#sign out process', function() {
+  
+  it('should sign out', (done) => {
+    var host = "http://" + process.env.IP + ':' + process.env.PORT;
+    chai.request(host)
+      .post('/api/logout')
+      .set('content-type', 'application/json')
+      .set('Authorization', 'Bearer ' + authJwt)
+      .end((err, res) => {
+          if (err) {
+            console.log(err);
+          }
+          res.should.have.status(200);
+          res.body.should.be.a('object');
+          res.body.should.have.property('response');
+        done();
+      });
+  });
+  
+  it('should not allow signed out user to invoke api', (done) => {
+    var host = "http://" + process.env.IP + ':' + process.env.PORT;
+    chai.request(host)
+      .post('/api/securedMethod')
+      .set('content-type', 'application/json')
+      .set('Authorization', 'Bearer ' + authJwt)
+      .end((err, res) => {
+          res.should.have.status(401);
+          res.error.should.have.property('message');
+          res.error.text.should.equal('{"error":"Not a valid token"}');
+        done();
+      });
+  });
+  
+});
+  

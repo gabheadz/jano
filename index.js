@@ -3,6 +3,9 @@ var janoAutzFilter = require('./autzFilter');
 var janoSslFilter = require('./sslFilter');
 var janoAuth = require('./auth');
 var token = require("./token");
+var loki = require("lokijs");
+
+var db;
 
 var _conf = {
   appName: 'testApp',
@@ -14,10 +17,9 @@ var _conf = {
       { url: '\/api[a-zA-Z]*', method:'POST|GET', role:'\\w+', anon: false },
       { url: '\/', method:'\\w+', role:'\\w+', anon: true }
   ],
-  publicKey: '/home/workspace/public.pem',
-  privateKey: '/home/workspace/private_unencrypted.pem',
+  keysFolder:  '/home/ubuntu/workspace/jano/keys',
   validateIp: false,
-  sessionFile: '/home/workspace/janoSessions.json',
+  sessionFile: '/home/ubuntu/workspace/jano/janoSessions.json',
   authenticateFn: undefined,
   checkUserFn: undefined,
 }
@@ -26,6 +28,13 @@ module.exports = {
   
   configure: function(conf) {
     _conf = conf;
+    
+    var sessionFile;
+    if (!_conf.sessionFile) {
+      _conf.sessionFile = './janoSessions.json';
+    } 
+    db = new loki(_conf.sessionFile);
+    _conf.db = db;
   },
   
   /**
@@ -68,11 +77,18 @@ module.exports = {
     return janoSslFilter.filter(req, res, next)
   },
   
-  auth: function (req, res, next) {
+  signIn: function (req, res, next) {
     if (!req.janoConf) {
       req.janoConf = _conf;
     }    
-    return janoAuth(req, res, next);
+    return janoAuth.signIn(req, res, next);
+  },
+  
+  signOut: function (req, res, next) {
+    if (!req.janoConf) {
+      req.janoConf = _conf;
+    }    
+    return janoAuth.signOut(req, res, next);
   }
   
 };

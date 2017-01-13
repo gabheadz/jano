@@ -19,10 +19,9 @@ var conf = function(_jano) {
         { url: '\/api[a-zA-Z]*', method:'POST|GET', role:'\\w+', anon: false },
         { url: '\/', method:'\\w+', role:'\\w+', anon: true }
     ],
-    publicKey: '/home/ubuntu/workspace/jano/test/public.pem',
-    privateKey: '/home/ubuntu/workspace/jano/test/private_unencrypted.pem',
+    keysFolder: '/home/ubuntu/workspace/jano/test',
     validateIp: false,
-    sessionFile: '/home/ubuntu/workspace/janoSessions.json',
+    sessionFile: '/home/ubuntu/workspace/jano/test/janoSessions.json',
     authenticateFn: login.authenticateUserAgainstRepo,
     checkUserFn: login.isValidUserInRepo
   });
@@ -32,14 +31,14 @@ var conf = function(_jano) {
   app.use(jano.autzFilter);
   
   app.post('/api/login', 
-    jano.auth,             //Jano function that invokes 'janoConf.authenticateFn' and generates a JWT
+    jano.signIn,                  //Jano function that invokes 'janoConf.authenticateFn' and generates a JWT
     function(req, res, next) {    //function to process response
       if (req.error) {
         res.status(500).json({ status: {code:500, message: req.error.message} });
         return;
       }
       //just return the signed JWT. Optionally this function could send a Cookie.
-      res.status(200).json({ status: {'code':200, 'message':"ok"}, response: { 'jwt': req.jwt } });
+      res.status(200).json({ status: {'code':200, 'message':"user signed in"}, response: { 'jwt': req.jwt } });
   });
   
   app.post('/api/securedMethod', function(req, res) {
@@ -48,6 +47,17 @@ var conf = function(_jano) {
   
   app.post('/api/anotherMethod', function(req, res) {
     res.status(200).json({ status: {code:200, message:"ok"}, response: { id:1, name:'secure and role validated transaction invoked' }});
+  });
+  
+  app.post('/api/logout', 
+    jano.signOut,                  //Jano function that invalidates a previously generated JWT
+    function(req, res, next) {     //function to process response 
+      if (req.error) {
+        res.status(500).json({ status: {code:500, message: req.error.message} });
+        return;
+      }
+      //just return the signed JWT. Optionally this function could send a Cookie.
+      res.status(200).json({ status: {'code':200, 'message':"user signed out"}, response: null });
   });
   
   app.listen(process.env.PORT, function () {

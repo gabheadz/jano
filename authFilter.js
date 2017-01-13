@@ -3,6 +3,20 @@ var fs = require("fs");
 var token = require("./token");
 const debug = require('debug')('jano');
 
+var db;
+var sessions;
+
+var getSessionsCollection = function(req, res) {
+    if (!db)
+        db = req.janoConf.db;
+    if (db && !sessions) {
+        sessions = db.getCollection('janoSessions');
+        if (!sessions)
+            sessions = db.addCollection('janoSessions');
+    }
+    return sessions != null;
+}
+
 /**
  * Function that process a request and determines if requestor is authenticated. That is 
  * if requestor provided a JWT in the 'Authorization' http header, and the JWT is valid
@@ -14,6 +28,11 @@ var filter = function(req, res, next) {
     if (!req.janoConf) {
         res.status(500).json({ error: 'Jano not configured' });
         return;    
+    }
+    
+    if (!getSessionsCollection(req, res)) {
+        res.status(500).json({ error: "Could not create db or session collection" });
+        return;
     }
     
     if (isWhiteListed(req)) {
@@ -36,17 +55,28 @@ var filter = function(req, res, next) {
         return;
     }
     
-    if (!req.janoConf.publicKey || req.janoConf.publicKey === undefined) {
-        res.status(500).json({ error: 'Pub/Priv keys not configured' });
+    if (!req.janoConf.keysFolder || req.janoConf.keysFolder === undefined) {
+        res.status(500).json({ error: 'Pub/Priv keys folder not configured' });
         return;
     }
     
     //read public key file, to validate jwt
-    var cert = fs.readFileSync(req.janoConf.publicKey);  // get public key
+    var cert = fs.readFileSync(req.janoConf.keysFolder+'/'+req.janoConf.appName+'_public.pem');  // get public key
     try {
-        //verifies jwt token and, if valid, returns the payload. Then
+        
+        //verifies jwt token and, if valid, returns the payload.
+        var payload = token.verify(req.get('Authorization').substring(7), cert);
+
+        //checks if the jwt was previusly generated and marked as not active
+        var session =  sessions.findOne({ uuid: payload.uuid });
+        if (session && !session.isActive) {
+            res.status(401).json({ error: 'Not a valid token' });
+            return;
+        }
+        
         //sets te payload in request for other middleware to use
-        req.credentials = token.verify(req.get('Authorization').substring(7), cert);
+        req.credentials = payload;
+        
     } catch(err){
         debug(err);
         //TODO: depending on error return status 500 or 401
