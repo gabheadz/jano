@@ -7,4 +7,4 @@
     -------------------------
 
 
-REST API security framework 
+Security framework for REST APIs implemented with Express. 
