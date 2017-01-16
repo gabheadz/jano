@@ -61,11 +61,16 @@ var filter = function(req, res, next) {
     }
     
     //read public key file, to validate jwt
-    var cert = fs.readFileSync(req.janoConf.keysFolder+'/'+req.janoConf.appName+'_public.pem');  // get public key
+    var certFile = req.janoConf.keysFolder+'/'+req.janoConf.appName+'_public.pem';
+
     try {
+        var claimsToValidate = {
+            'aud': req.janoConf.appName
+        }
         
         //verifies jwt token and, if valid, returns the payload.
-        var payload = token.verify(req.get('Authorization').substring(7), cert);
+        var payload = token.verify(req.get('Authorization').substring(7), 
+            certFile, claimsToValidate);
 
         //checks if the jwt was previusly generated and marked as not active
         var session =  sessions.findOne({ uuid: payload.uuid });

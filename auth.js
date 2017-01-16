@@ -1,5 +1,4 @@
 var token = require("./token");
-var fs = require("fs");
 var Promise = require("bluebird");
 
 const debug = require('debug')('jano');
@@ -37,7 +36,7 @@ var signIn = function(req, res, next) {
     if (strategy === USR_PWD_STRATEGY) {
         
         var promisesNewSession = [
-          hasAnActiveSession(req), 
+          hasAnActiveSessionByUsername(req), 
           autenticateWithUsrAndPwd(req)
         ];
         Promise.all(promisesNewSession).then(function(allData) {
@@ -46,35 +45,56 @@ var signIn = function(req, res, next) {
             * Write payload to sessions file. This helps in controlling the
             * number of active sessions.
             */
-            saveSession(req, allData[1].payload).then(function(data) {
+            debug('Saving token from usr/pwd autentication');
+            saveSession(allData[1].payload).then(function(data) {
                 req.jwt = allData[1].jwt;
                 next();
             }, function(err) {
+                debug(err);
                 req.error = err;
                 next();
             });
             
         }, function(err) {
+            debug(err);
             req.error = err;
             next();
         });
         
     }
     else if (strategy === TOKEN_STRATEGY) {
-        authenticateWithJwt(req).then(function(data) {
-            req.jwt = data;
-            next();
-        }, function(err){
+
+        var promisesNewSession = [
+          checkJWTPresentedAsCredential(req), 
+          hasAnActiveSessionByToken(req),
+          authenticateWithJwt(req)
+        ];
+        Promise.all(promisesNewSession).then(function(allData) {
+            
+            /*
+            * Write payload to sessions file. This helps in controlling the
+            * number of active sessions.
+            */
+            debug('Saving new token from JWT autentication');
+            saveSession(allData[2].payload).then(function(data) {
+                req.jwt = allData[2].jwt;
+                next();
+            }, function(err) {
+                debug(err);
+                req.error = err;
+                next();
+            });
+            
+        }, function(err) {
+            debug(err);
             req.error = err;
             next();
         });
+
     } else {
         req.error =  new Error("Unable to determine authentication strategy.");
         next();
     }
-
-    //TODO: check & control number of sessions opened.
-
 }
 
 /**
@@ -121,21 +141,22 @@ var autenticateWithUsrAndPwd = function(req) {
                 var payload = {
                     sub: data.subject,
                     iss: req.janoConf.appName,
+                    aud: req.janoConf.appName,
                     ipaddr: req.ip,
                     roles: data.roles
                 }
                 
                 var keyFile = req.janoConf.keysFolder+'/'+req.janoConf.appName+'.pem';
                 debug('keyFile: %s', keyFile);
-                var cert = fs.readFileSync(req.janoConf.keysFolder+'/'+req.janoConf.appName+'.pem');  // get private key
-                debug('authentication successful');
-    
-                var result = token.sign(payload, cert);
+
+                var result = token.sign(payload, keyFile);
                 result.payload.isActive = true;
+                
+                debug('authentication successful');
                 resolve( result );
                 
             }, function(err) {
-                console.log(err);
+                debug(err);
                 reject(err);
             });
         }
@@ -147,13 +168,45 @@ var autenticateWithUsrAndPwd = function(req) {
 
 /**
  *  Checks the user (subject in the jwt) has been issued a signed JWT and it is
- *  valid (not expired) or discarded by the user when signs out (active = false)
+ *  valid (not expired)
  */ 
-var hasAnActiveSession = function(req) {
+var hasAnActiveSessionByToken = function(req) {
+    return new Promise(function(resolve, reject){
+        var jwt_token = req.params.token || req.query.token;
+    
+        if (!jwt_token) {
+            reject(new Error("Token credential not provided as param or query property"));
+            return;        
+        }
+    
+        var decoded_jwt = token.decode(jwt_token);
+        if (!decoded_jwt) {
+            reject(new Error("Token credential decodification error"));
+        }
+        
+        var result = sessions.where(function(obj) {
+            return (obj.sub === decoded_jwt.sub) && (obj.isActive == true);
+        });
+        
+        if (!result)
+            resolve({'activeSessions': false});
+        else if (result.length == 0)
+            resolve({'activeSessions': false});
+        else {
+            reject(new Error("User already have an active session."));
+        }
+    })
+}
+
+/**
+ *  Checks the user (username parameter in body request) has been issued a 
+ *  signed JWT and its valid (not expired)
+ */ 
+var hasAnActiveSessionByUsername = function(req) {
     return new Promise(function(resolve, reject){
         var username = req.body.username;
         if (!username) {
-            reject(new Error("Username and/or password credentials not provided in request body."));
+            reject(new Error("Error checking current sessions. Username not provided in request body."));
             return;
         }
         
@@ -172,17 +225,83 @@ var hasAnActiveSession = function(req) {
 }
 
 /**
+ *  Checks if the requestor has presented a discarded JWT (discarded by the user
+ *  when signs out, or a JWT from another App used to sign in in this app)
+ */ 
+var checkJWTPresentedAsCredential = function(req) {
+    return new Promise(function(resolve, reject){
+
+        var jwt_token = req.params.token || req.query.token;
+    
+        if (!jwt_token) {
+            reject(new Error("Token credential not provided as param or query property"));
+            return;        
+        }
+    
+        var decoded_jwt = token.decode(jwt_token);
+        if (!decoded_jwt) {
+            reject(new Error("Token credential decodification error"));
+        }
+
+        // First validate the JWT signature
+        var sourceAppKeyFile = req.janoConf.keysFolder+'/'+decoded_jwt.payload.iss+'_public.pem';
+        var claimsToValidate = {
+            'aud': req.janoConf.appName
+        }
+        
+        try {
+            token.verify(jwt_token,sourceAppKeyFile, claimsToValidate);
+        } catch(err) {
+            debug(err);
+            reject(new Error("Token validation failed"));
+        }
+        
+        // Second validates if the JWT has been invalidated/discarded
+        var result = sessions.where(function(obj) {
+            return (obj.uuid === decoded_jwt.uuid) && (obj.isActive == false);
+        });
+        
+        
+        if (result && result.length > 0){
+            reject(new Error("JWT represents an already discarded session."));
+        }
+        
+        /*
+         * At this point the JWT used as credential is valid and has not been
+         * Discarded. Creation of a new signed JWT may proceed, but first this
+         * JWT credential itself is to be marked as discarded.
+        */
+        decoded_jwt.payload.isValid = false;
+        debug('Saving token from JWT autentication');
+        saveSession(decoded_jwt.payload).then(function (data) {
+            resolve(true);
+        }, function(err) {
+            debug(err);
+            reject(new Error("Error saving user session"));
+        })
+    })
+}
+
+/**
  * Saves the token in the in-memmory db 
  */
-var saveSession = function(req, sessionObj) {
+var saveSession = function(sessionObj) {
     return new Promise(function(resolve, reject){
-        sessions.insert(sessionObj);
-        resolve('session inserted into collection');
+        if (!sessionObj) {
+            reject(new Error("El objeto a almacenar no es valido"))
+        }
+        else {
+            debug('Object to save %s', JSON.stringify(sessionObj));
+            sessions.insert(sessionObj);
+            resolve(true);
+        }
     });
 } 
 
 /**
  * Authenticate a user using a JWT previusly issued by this app o other app.
+ * 
+ * Promise should resolve the signed jwt.
  */ 
 var authenticateWithJwt = function(req) {
     
@@ -190,14 +309,53 @@ var authenticateWithJwt = function(req) {
 
         debug("Authenticating with token");
     
-        var token = req.params.token || req.query.token;
+        var jwt_token = req.params.token || req.query.token;
     
-        if (!token) {
+        if (!jwt_token) {
             reject(new Error("Token credential not provided as param or query property"));
             return;        
         }
         
-        reject(new Error("Not Implemented yet"));
+        var decoded_jwt = token.decode(jwt_token);
+        if (!decoded_jwt) {
+            reject(new Error("Token credential decodification error"));
+        }
+        
+        //validates user, calling provided user function 'checkUserFn'
+        if (req.janoConf.checkUserFn) {
+            req.janoConf.checkUserFn(decoded_jwt.payload.sub).then(function (data){
+                //proceeds to create a new JWT and sign it
+                if (!data.subject || !data.roles) {
+                    reject(new Error("'checkUserFn' did not resolve required data for JWT: subject and/or roles."));
+                    return;
+                }
+                
+                var new_payload = {
+                    sub: data.subject,
+                    iss: req.janoConf.appName,
+                    aud: req.janoConf.appName,
+                    ipaddr: req.ip,
+                    roles: data.roles
+                }
+                
+                var thisAppPrivateKeyFile = req.janoConf.keysFolder+'/'+req.janoConf.appName+'.pem';
+                debug('private key file: %s', thisAppPrivateKeyFile);
+
+                var result = token.sign(new_payload, thisAppPrivateKeyFile);
+                debug('authentication successful');
+
+                result.payload.isActive = true;
+                resolve( result );                    
+
+            }, function(err) {
+                debug(err);
+                reject(new Error("Error during user/roles validation"));
+            });
+        } else {
+            reject(new Error("No checkUserFn defined"));
+        }
+        
+        
     });
 }
 

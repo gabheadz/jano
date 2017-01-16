@@ -1,12 +1,15 @@
 var jwt = require('jsonwebtoken');
+var fs = require("fs");
+
 const uuidV4 = require('uuid/v4');
+const debug = require('debug')('jano');
 
 module.exports = {
   /**
   * Takes an object payload and a private cert and generates a signed JWT.
   *
   * @param  {object} payload
-  * @param  {String} private cert
+  * @param  {String} private cert file name
   * @return {String} jwt
   */
   sign: function(payload, cert) {
@@ -38,7 +41,21 @@ module.exports = {
     
     payload.uuid = uuidV4();
     
-    var token = jwt.sign(payload, cert, options);
+    if (!cert) {
+      throw new Error('invalid certificate file for signing');
+    }
+    
+    debug('private key file is: %s', cert);
+    var thisAppPrivateKey;  
+
+    try {
+        thisAppPrivateKey = fs.readFileSync(cert); // read private key file
+    } catch (err) {
+        debug(err);
+        throw err;
+    }
+    
+    var token = jwt.sign(payload, thisAppPrivateKey, options);
     
     return { 'payload': payload, 'jwt': token};
 
@@ -49,10 +66,11 @@ module.exports = {
    * function returns the jwt payload
    *
    * @param  {String} signed jwt
-   * @param  {String} the private cert
+   * @param  {String} the public cert file name
+   * @param  {object} claims to validate (optional)
    * @return {object} the object payload
    */
-  verify: function(token, cert, iss) {
+  verify: function(token, cert, claims) {
     
     if (!token || token === undefined) {
       throw new Error('invalid token string');
@@ -66,11 +84,40 @@ module.exports = {
       algorithms: ['RS256']
     }
     
-    if (iss) {
-      options.issuer = iss;
+    
+    if (claims) {
+      if (claims.iss)
+        options.issuer = claims.iss;
+      if (claims.aud)
+          options.audience = claims.aud;
     }
     
-    return jwt.verify(token, cert, options);
+    debug('private key file is: %s', cert);
+    var thisAppPublicKey;  
+
+    try {
+        thisAppPublicKey = fs.readFileSync(cert); // read public key file
+    } catch (err) {
+        debug(err);
+        throw new Error('Error reading priv/pub key file for validation');
+    }
     
+    return jwt.verify(token, thisAppPublicKey, options);
+    
+  },
+  
+    /**
+   * Takes a signed JWT and decode it (whitout signature validation)
+   *
+   * @param  {String} signed jwt
+   * @return {object} the object payload
+   */
+  decode: function(token) {
+    if (!token || token === undefined) {
+      throw new Error('invalid token string');
+    }
+    
+    return jwt.decode(token, {complete: true});
   }
+  
 };

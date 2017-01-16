@@ -13,7 +13,7 @@ var conf = function(_jano) {
   jano.configure({
     appName: 'testApp',
     rules: [
-        { url: '\/api\/login', method:'POST', role:'\\w+', anon: true },
+        { url: '\/api\/login', method:'POST|GET', role:'\\w+', anon: true },
         { url: '\/api\/securedMethod', method:'POST|GET', role:'\\w+', anon: false },
         { url: '\/api\/anotherMethod', method:'POST', role:'admin|sales', anon: false },
         { url: '\/api[a-zA-Z]*', method:'POST|GET', role:'\\w+', anon: false },
@@ -31,6 +31,17 @@ var conf = function(_jano) {
   app.use(jano.autzFilter);
   
   app.post('/api/login', 
+    jano.signIn,                  //Jano function that invokes 'janoConf.authenticateFn' and generates a JWT
+    function(req, res, next) {    //function to process response
+      if (req.error) {
+        res.status(500).json({ status: {code:500, message: req.error.message} });
+        return;
+      }
+      //just return the signed JWT. Optionally this function could send a Cookie.
+      res.status(200).json({ status: {'code':200, 'message':"user signed in"}, response: { 'jwt': req.jwt } });
+  });
+  
+  app.get('/api/login', 
     jano.signIn,                  //Jano function that invokes 'janoConf.authenticateFn' and generates a JWT
     function(req, res, next) {    //function to process response
       if (req.error) {
