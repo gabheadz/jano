@@ -77,6 +77,8 @@ var aRule = { url: '\/api\/securedMethod', method:'POST|GET', role:'\\w+', anon:
 | role | user role o roles required to grant application endpoint invocation (regular expression) |
 | anon | flag indicating that the application endpoint may be called anonymously. If this property is ```true``` no authentication validation is performed and roles defined un ```role``` atribute are not enforced. |
 
+Order is important: First rule matched given a url and method will be used to authorize the request. All subsequent rules are discarded.
+
 ## Keys and Keys Folder
 
 Jano uses private/public keys to Sign and Validate Json Web Tokens (JWTs). JWTs are generated and signed using a private key and returned to client upon successful authentication. Client is bound to send this JWT in the ```Authorization``` header in every request. Jano will validate the existence of this header value and will validate the JWT signature using a public Key.
