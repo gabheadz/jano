@@ -58,14 +58,60 @@ jano.configure({
 | authenticateFn | User provided function invoked by the framework to autenticate an user/password against a repository |
 | checkUserFn | User provided function invoked by the framework to validate an user in a repository |
 
-### Using middleware in express app
+
+
+## Rules
+
+Jano configuration includes an array of rules to be applied to incoming requests in order to determine if an application endpoint is to be autorized and a route method invoked.
+
+Rules are defined as follows:
 
 ```
-app.use(jano.authFilter);
-app.use(jano.autzFilter);
+var aRule = { url: '\/api\/securedMethod', method:'POST|GET', role:'\\w+', anon: false }
 ```
+
+| Property | Description  |
+|---|---|
+| url  | The application endpoint defined in app (regular expression)  |
+| method | Method or methods allowed (regular expression)  |
+| role | user role o roles required to grant application endpoint invocation (regular expression) |
+| anon | flag indicating that the application endpoint may be called anonymously. If this property is ```true``` no authentication validation is performed and roles defined un ```role``` atribute are not enforced. |
+
+## Keys and Keys Folder
+
+Jano uses private/public keys to Sign and Validate Json Web Tokens (JWTs). JWTs are generated and signed using a private key and returned to client upon successful authentication. Client is bound to send this JWT in the ```Authorization``` header in every request. Jano will validate the existence of this header value and will validate the JWT signature using a public Key.
+
+So, every application should have a key pair (private/public) which will be used by Jano. The location of these keys are specified in ```keysFolder``` property.
+
+The certificate files shoud be named in accordance to the application name defined in the ```appName```attribute. Let's say:
+
+```
+jano.configure({
+  appName: 'testApp',
+  ...
+  keysFolder: '/home/ubuntu/workspace/keys',
+  ...
+```
+Jano will expect two files in **/home/ubuntu/workspace/keys** folder: 
+
+- **testApp.pem** (the private key)  
+- **testApp_public.pem** (the public key)
+
+
+## Session File
+
+Jano uses a in-memmory database (LokiJS) to mantain a registry of signed JWT's. This is not a web session or web session related data,  since API should be stateless. This in-memmory db uses this file to persist data automatically from time to time.
+
+So, 
+
+- Every time a user signs in and a JWT is generated, the JWT uuid is registered in this db, with a status ```isActive = true```
+- When an user signs out, the JWT associated with that user is marked as no longer active. ```isActive = false```
+
+This helps to determine which JWTs are not longer valid, since JWTs have an expiry time that cannot be altered. A user may sign out after a short period of time and the JWT associated is still valid (since it has not expired). This registry helps to control the future use of a JWT that a user 'discarded' when signed out.
 
 ## Sign In
+
+Jano provides a function to sign a JWT with the user subject name and its roles ```signIn```. This method relies on the **authenticateFn** provided by the app.
 
 ```
 app.post('/api/login', 
@@ -79,8 +125,40 @@ app.post('/api/login',
     res.status(200).json({ status: {'code':200, 'message':"ok"}, response: { 'jwt': req.jwt } });
 });
 ```
+### The *'authenticateFn'* function
+
+Jano expects this function to return a Promise. The function will be passed the username and password parameters.
+
+```
+/*
+* Function to perform authentication against an user repo.
+*/
+exports.authenticateUserAgainstRepo = function(username, password) {
+    return new Promise(function(resolve, reject){
+        if (!username || !password) {
+            reject(new Error("username and/or password not provided"));
+        }
+        else {
+            //TODO: Connect to an user repository (example: ldap) and check user/password
+            //TODO: Get user groups, and translate them into roles
+
+            /* If successful, return an JSON object with the subject and roles.
+             * Jano will use this info in the payload that will be signed into the JWT
+             */
+            resolve({ 'subject': username, 'roles': ['role1', 'role2'] })
+            
+            //If authentication not successful reject promise with an error:
+            //reject(new Error("Wrong username and/or password"));
+            //reject(new Error("Unexpected error during login process"));
+        }
+	});
+};
+```
+
 
 ## Sign Out
+
+Jano provides a signOut function which registers the associated user JWT as no longer valid. Subsequent invocations by the client of the API using that JWT in the authorization header, will fail with a 401 error.
 
 ```
 app.post('/api/logout', 
@@ -95,23 +173,28 @@ app.post('/api/logout',
 });
 ```
 
-## Securing API invocation
+## Securing API endpoints
 
-Basically no aditional code is required to secure routes. Since in ```app.use(..)``` we have especified the use of authentication and authorization filters defined in jano. 
+In order to secure API endpoints defined in Express, you have to indicate the app to use the Jano Filters:
+
+```
+app.use(jano.authFilter);
+app.use(jano.autzFilter);
+```
+
+Basically no aditional code is required in the routing endpoints or endpoint methods. 
 
 ```
 app.post('/api/securedMethod', function(req, res) {
-  //at this point jano has allowed the invocation of this route
+  
+  //hey Mom look... no hands (a.k.a business logic)
+  
   res.status(200).json({ status: {code:200, message:"ok"}, response: { id:1, name:'secure transaction invoked' }});
 });
 
-app.post('/api/anotherMethod', function(req, res) {
-  //at this point jano has allowed the invocation of this route, based on rules defined in janoConf.
-  res.status(200).json({ status: {code:200, message:"ok"}, response: { id:1, name:'secure and role validated transaction invoked' }});
-});
 ```
 
-The Client has to send the ```Authorization``` header in every request so jano can determine if user is authenticated/authorized.
+The Client has to send the ```Authorization``` header in every request so jano filters can determine if user is authenticated/authorized.
 
 ```
 var invokeMethod1 = function() {
