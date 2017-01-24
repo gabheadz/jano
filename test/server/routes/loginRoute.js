@@ -15,7 +15,12 @@ exports.authenticateUserAgainstRepo = function(username, password) {
 
             //if successful, return an jSON object with the subject and roles.
             //Jano will use this info in the payload signed into the JWT
-            resolve({ 'subject': username, 'roles': ['role1', 'role2'] })
+            resolve({ 
+                'subject': username, 
+                'roles': ['role1', 'role2'], 
+                'email': username+'@localdomain.com',
+                'name' : 'FirstName Middlename LastName'
+            })
             
             //TODO: if authentication not successful reject with an error:
             
@@ -41,7 +46,12 @@ exports.isValidUserInRepo = function(username) {
             
             //if user is valid, return an jSON object with the subject and roles.
             //Jano will use this info in the payload signed into the JWT
-            resolve({ subject: username, roles: ['role1', 'role2'] });
+            resolve({ 
+                'subject': username, 
+                'roles': ['role1', 'role2'], 
+                'email': username+'@localdomain.com',
+                'name' : 'FirstName Middlename LastName'
+            })
             
             //TODO: if user is not valid reject with an error object:
             

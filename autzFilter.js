@@ -1,6 +1,7 @@
 var _ = require("lodash");
 var fs = require("fs");
 var token = require("./token");
+const debug = require('debug')('jano');
 
 /**
  * Function that process a request and determines if requestor is authorized. That is 
@@ -11,11 +12,13 @@ var token = require("./token");
 var filter = function(req, res, next) {
     
     if (req.whitelisted) {
+        debug('autzFilter: is whitelisted');
         next();
         return;
     }
     
     var _ruleSelected = appliesToRequest(req);
+    debug('autzFilter: rule matched (%s)', JSON.stringify(_ruleSelected));
     if(_ruleSelected) {
         var roleMatched = _.find(req.credentials.roles, function(r) {
             if (r.match(_ruleSelected.role)) {
@@ -25,6 +28,7 @@ var filter = function(req, res, next) {
             }
         });
         if (roleMatched) {
+            debug('autzFilter: role matched!');
             next();
         } else {
             res.status(403).json({ error: 'Insufficient privileges to invoke api method'});
@@ -47,6 +51,7 @@ var appliesToRequest = function(req) {
         
     var url = req.originalUrl;
     var method = req.method;
+    debug('autzFilter: requested url ( %s ) with method ( %s )', url, method);
 
     var _rule = _.find(req.janoConf.rules, function(o) {
         var urlMatch = url.match(o.url);

@@ -45,7 +45,6 @@ module.exports = {
       throw new Error('invalid certificate file for signing');
     }
     
-    debug('private key file is: %s', cert);
     var thisAppPrivateKey;  
 
     try {
@@ -92,7 +91,6 @@ module.exports = {
           options.audience = claims.aud;
     }
     
-    debug('private key file is: %s', cert);
     var thisAppPublicKey;  
 
     try {

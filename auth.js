@@ -143,7 +143,9 @@ var autenticateWithUsrAndPwd = function(req) {
                     iss: req.janoConf.appName,
                     aud: req.janoConf.appName,
                     ipaddr: req.ip,
-                    roles: data.roles
+                    roles: data.roles,
+                    name: data.name || 'na',
+                    email: data.email || 'na'
                 }
                 
                 var keyFile = req.janoConf.keysFolder+'/'+req.janoConf.appName+'.pem';

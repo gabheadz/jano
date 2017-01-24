@@ -38,12 +38,14 @@ var filter = function(req, res, next) {
     if (isWhiteListed(req)) {
         //no credencials are set on request, only a flag to indicate the requestor is whitelisted
         req.whitelisted = true;
+        debug('authFilter: is whitelisted');
         next();
         return;
     }
     
     if (isAnonAllowed(req)) {
         req.anon = true;
+        debug('authFilter: anon permited');
         next();
         return;
     }
@@ -71,7 +73,8 @@ var filter = function(req, res, next) {
         //verifies jwt token and, if valid, returns the payload.
         var payload = token.verify(req.get('Authorization').substring(7), 
             certFile, claimsToValidate);
-
+        debug('authFilter: token received is valid');
+        
         //checks if the jwt was previusly generated and marked as not active
         var session =  sessions.findOne({ uuid: payload.uuid });
         if (session && !session.isActive) {

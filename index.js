@@ -43,6 +43,11 @@ module.exports = {
   tokenSign: token.sign,
   
   /**
+   * Function to decode a JWT without signature validation
+   */
+  tokenDecode: token.decode,
+
+  /**
    * Function to verify a signed JWT
    */ 
   tokenVerify: token.verify,
