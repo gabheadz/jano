@@ -1,6 +1,6 @@
 {
   "name": "jano",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Jano Rest API Auth/Authz",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://gabheadz@bitbucket.org/gabheadz/jano.git"
+    "url": "git+https://github.com/gabheadz/jano.git"
   },
   "keywords": [
     "rest",
@@ -36,5 +36,5 @@
     "mocha": "^3.2.0",
     "multer": "^1.2.1"
   },
-  "homepage": "https://bitbucket.org/gabheadz/jano#readme"
+  "homepage": "https://github.com/gabheadz/jano"
 }
